@@ -41,6 +41,7 @@ h2{font-size:20px}
 .lbl{font-weight:700;font-size:14px;display:block;margin-bottom:6px}
 input.txt{width:100%;font:inherit;font-size:17px;padding:11px 12px;border:1.5px solid var(--line);border-radius:10px;background:var(--bg);color:var(--ink)}
 .tests{display:grid;gap:7px}
+.revbox{display:grid;gap:6px;padding:12px 14px;border:2px solid var(--accent);border-radius:12px;background:var(--surface)}.revbox p{margin:0}
 .books{display:grid;grid-template-columns:repeat(5,1fr);gap:7px}
 .book{padding:12px 6px;border:1.5px solid var(--line);border-radius:12px;background:var(--bg);color:var(--ink);font-weight:700;font-size:15px;cursor:pointer}
 .book[aria-checked="true"]{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
@@ -231,6 +232,7 @@ const TESTS_VOC1 = [
 /* 11/19 준호: 고3 월~금 단어 시험 (하루 80, 영→한, 틀린 5개 이하 통과) */
 const TESTS_G3D = [
   {id:"d80",name:"오늘의 단어 시험 80",pass:0,parts:[["ek",80]],how:"영어 단어 70 + 숙어 10을 보고 알맞은 한국어 뜻을 골라요. 문제당 7초, 모두 맞혀야 통과예요. 틀린 문제가 있으면 틀린 것만 다 맞힐 때까지 다시 풀어요."},
+  {id:"rev",name:"오늘의 복습",hidden:true,pass:0,parts:[["ek",0]],how:"전에 틀린 단어를 1·3·7·14·30일 뒤에 다시 봐요."},
   TESTS_STD[TESTS_STD.length-1]
 ];
 const testsFor = m=>m.tests==="g3d"?TESTS_G3D:m.tests==="voc1"?TESTS_VOC1:m.tests==="voc2"?TESTS_VOC2:m.tests==="voc"?TESTS_VOC:m.tests==="pen"?TESTS_PEN:TESTS_STD;
@@ -253,6 +255,43 @@ const total = t=>t.parts.reduce((a,[,n])=>a+n,0);
 const poolOf = s=>s==="sac"?[...DATA.sac1,...DATA.sac2]:s==="gox"?DATA.gram:DATA[s];
 const partTxt = t=>t.sum||t.parts.map(([s,n])=>`${SUB[s].label} ${n}${s==="order"?"문장":""}`).join(" · ");
 const timeTxt = t=>[...new Set(t.parts.map(([s])=>SUB[s].time))].map(x=>x+"초").join("·");
+
+
+/* 간격 반복(망각곡선): 틀린 단어는 1일 뒤 → 맞히면 3일 → 7일 → 14일 → 30일 뒤 다시. 복습에서 또 틀리면 1일부터 다시. 이 폰(브라우저)에만 저장 */
+const SRS_INT=[1,3,7,14,30];
+const SRSKEY=name=>"wt6-srs-g3-"+clean(name);
+function dayStr(add){const d=new Date();d.setHours(12,0,0,0);d.setDate(d.getDate()+(add||0));const p=n=>String(n).padStart(2,"0");return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}`}
+function mdStr(s){const [,m,d]=s.split("-");return `${+m}월 ${+d}일`}
+function srsLoad(name){try{const o=JSON.parse(localStorage.getItem(SRSKEY(name))||"{}");return o&&typeof o==="object"?o:{}}catch(e){return {}}}
+function srsSave(name,o){try{localStorage.setItem(SRSKEY(name),JSON.stringify(o))}catch(e){}}
+function srsQ(e){const D=ALL[e.l]&&ALL[e.l].data;const q=D&&D.ek.find(x=>x.word===e.w);return q?{...q,_t:"ek"}:null}
+function srsDue(name){const t=dayStr(0);return Object.values(srsLoad(name)).filter(e=>e&&e.due<=t&&srsQ(e))}
+function srsNext(name){const t=dayStr(0),f=Object.values(srsLoad(name)).filter(e=>e&&e.due>t).map(e=>e.due).sort();return f.length?{d:f[0],n:f.filter(x=>x===f[0]).length,all:f.length}:null}
+function srsHit(q,ok){try{
+  if(q._t!=="ek")return;const o=q._o||q;if(!o.lesson||!ALL[o.lesson])return;
+  const S=srsLoad(G.name),k=o.word;
+  if(!ok){S[k]={w:k,l:o.lesson,s:0,due:dayStr(SRS_INT[0]),miss:((S[k]&&S[k].miss)||0)+1}}
+  else if(G.id==="rev"&&!G.retry&&S[k]){const s=S[k].s+1;if(s>=SRS_INT.length){delete S[k];G.mastered=(G.mastered||0)+1}else S[k]={...S[k],s,due:dayStr(SRS_INT[s])}}
+  else return;
+  srsSave(G.name,S);
+}catch(e){}}
+function revBox(name){
+  name=(name||"").trim();
+  if(!name)return `<b>🔁 오늘의 복습</b><p class="hint">이름을 쓰면 오늘 다시 볼 단어가 나와요.</p>`;
+  const due=srsDue(name),nx=srsNext(name);
+  if(due.length)return `<b>🔁 오늘의 복습 ${due.length}개</b><p class="hint">전에 틀린 단어를 잊어버릴 때쯤(1·3·7·14·30일 뒤) 다시 봐요. 모두 맞혀야 통과예요.</p><button type="button" class="btn" id="rev">오늘의 복습 ${due.length}개 시작하기</button>`;
+  return `<b>🔁 오늘의 복습</b><p class="hint">${nx?`오늘은 복습할 단어가 없어요. 다음 복습: <b>${mdStr(nx.d)}</b> ${nx.n}개 (예정 ${nx.all}개)`:"틀린 단어가 생기면 1·3·7·14·30일 뒤에 여기서 다시 보게 돼요."}</p>`;
+}
+function revBind(){const b=$("#rev");if(b)b.onclick=()=>{const v=$("#nm").value.trim();if(!v)return;LS.set("wt-name",v);clearG();ac();REV_FRESH=true;startGame(v,"rev",srsDue(v).map(srsQ).filter(Boolean))}}
+let REV_FRESH=false;
+function srsResult(){
+  if(!G||!G.name)return "";
+  const nx=srsNext(G.name),due=srsDue(G.name).length;
+  const wr=G.wrong.length?`틀린 ${G.wrong.length}개는 <b>${mdStr(dayStr(1))}</b> 복습에 다시 나와요. `:"";
+  const ms=G.mastered?`${G.mastered}개는 30일 복습까지 끝나서 졸업했어요. `:"";
+  const rest=due?`오늘 복습할 단어가 ${due}개 남았어요.`:nx?`다음 복습: ${mdStr(nx.d)} ${nx.n}개`:"";
+  return (wr||ms||rest)?`<div class="when">🔁 ${wr}${ms}${rest}</div>`:"";
+}
 
 /* sound */
 let soundOn = LS.get("wt-sound")!=="off", actx=null;
@@ -283,6 +322,7 @@ function renderStart(){
   <form class="panel" id="f">
     <div><span class="lbl" id="bl">요일 고르기</span><div class="books" role="radiogroup" aria-labelledby="bl">${Object.keys(ALL).map(k=>`<button type="button" class="book" role="radio" data-b="${k}" aria-checked="${k===BOOK}">${esc(ALL[k].meta.short)}</button>`).join("")}</div></div>
     <div><label class="lbl" for="nm">이름</label><input class="txt" id="nm" autocomplete="name" maxlength="20" placeholder="이름을 입력하세요" value="${esc(name)}"></div>
+    <div class="revbox" id="revbox">${revBox(name)}</div>
     <div><span class="lbl" id="tl">시험 고르기</span>
     <div class="tests" role="radiogroup" aria-labelledby="tl">${TESTS.filter(x=>!x.hidden).map((x,i)=>`<button type="button" class="test${x.pen?" pen":""}" role="radio" id="t-${x.id}" data-id="${x.id}" aria-checked="${x.id===pick}"><span class="num">${i+1}</span><b>${x.name} · ${total(x)}문제</b><small>${partTxt(x)}</small><span class="meta">통과<br>${passMax(x)?passMax(x)+"개 이하":"모두 맞히기"}</span></button>`).join("")}</div></div>
     <ul class="rules">
@@ -303,7 +343,8 @@ function renderStart(){
   const lockPen=(sv&&T(sv.id).pen)||!!penBook;
   if(penBook)$("#f").insertAdjacentHTML("afterbegin",`<p class="hint" style="color:var(--bad)"><b>${esc(ALL[penBook].meta.short)}에 끝내지 못한 시험이 있어요. 먼저 이어서 끝내세요.</b></p>`);
   if(lockPen){go.disabled=true;go.textContent="패널티 시험부터 이어서 끝내세요"}
-  nm.oninput=()=>go.disabled=lockPen||!nm.value.trim();
+  nm.oninput=()=>{go.disabled=lockPen||!nm.value.trim();$("#revbox").innerHTML=revBox(nm.value);revBind()};
+  revBind();
   $("#note").onclick=()=>{const v=nm.value.trim();if(!v){nm.focus();nm.placeholder="이름을 먼저 입력하세요";return}LS.set("wt-name",v);renderNote(v)};
   if($("#cont"))$("#cont").onclick=()=>{ac();resumeG(sv)};
   if($("#drop"))$("#drop").onclick=()=>{clearG();renderStart()};
@@ -358,8 +399,8 @@ function resumeG(s){
   G={...s,t:T(s.id)};G.wrong=s.wrong.map(i=>G.qs[i]).filter(Boolean);mountGame();
 }
 function startGame(name,id,list){
-  G={name,id,retry:!!list&&id!=="note",t:T(id),qs:prep(id,list),i:0,score:0,correct:0,combo:0,maxCombo:0,wrong:[]};
-  mountGame();
+  G={name,id,retry:!!list&&id!=="note"&&!(id==="rev"&&REV_FRESH),t:T(id),qs:prep(id,list),i:0,score:0,correct:0,combo:0,maxCombo:0,wrong:[]};
+  REV_FRESH=false;mountGame();
 }
 function mountGame(){
   app.innerHTML=`<div class="hud"><span class="prog" id="prog"></span><span class="combo" id="combo"></span><span class="score" id="score">0</span></div>
@@ -396,13 +437,13 @@ const CHEERS={3:"좋아요! 3연속 🔥",5:"불붙었다! 5연속",7:"멈출 �
 function scoreIt(ok,anchor){
   const total=SUB[G.qs[G.i]._t].time*1000,left=Math.max(0,total-(performance.now()-t0));
   if(ok){
-    G.combo++;G.correct++;G.maxCombo=Math.max(G.maxCombo,G.combo);
+    srsHit(G.qs[G.i],true);G.combo++;G.correct++;G.maxCombo=Math.max(G.maxCombo,G.combo);
     const gain=100+Math.round(left/total*100)+Math.min((G.combo-1)*50,250);G.score+=gain;
     const f=document.createElement("div");f.className="float";f.textContent="+"+gain;$("#card").appendChild(f);
     if(anchor){const r=anchor.getBoundingClientRect();confetti(26,r.left+r.width/2,r.top+r.height/2,4)}sfxRight(G.combo);
     if(CHEERS[G.combo]||(G.combo>10&&G.combo%5===0)){const c=document.createElement("div");c.className="cheer";c.textContent=CHEERS[G.combo]||`${G.combo}연속! 대단해요`;document.body.appendChild(c);setTimeout(()=>c.remove(),1300)}
   }else{
-    G.combo=0;G.wrong.push(G.qs[G.i]);noteAdd(G.qs[G.i]);
+    G.combo=0;G.wrong.push(G.qs[G.i]);noteAdd(G.qs[G.i]);srsHit(G.qs[G.i],false);
     app.classList.remove("shake");void app.offsetWidth;app.classList.add("shake");
     const fl=$("#flash");fl.classList.remove("go");void fl.offsetWidth;fl.classList.add("go");sfxWrong();
   }
@@ -554,8 +595,8 @@ function renderResult(){
   const line=[META.code,t.name.replace(/\s/g,"")+(G.retry?"(오답재시험)":""),clean(G.name),G.correct,n,when,G.wrong.length,G.wrong.map(wrongKey).join(","),passed?"통과":"재시험"].join("|");
   app.innerHTML=`<div style="display:grid;gap:12px">
    <div class="panel">
-    <div class="grade"><div class="g g-${grade}">${grade}</div><div><div class="which">${NUMS[TESTS.indexOf(t)]} ${esc(t.name)}${G.retry?" · 틀린 문제 재시험":""} · ${esc(META.short)}</div><h2>${esc(G.name)} · ${label}</h2><p class="hint">${G.correct} / ${n} 정답 (${Math.round(pct*100)}%)</p></div></div>
-    <div class="when">📅 응시 날짜 <b>${when}</b></div>
+    <div class="grade"><div class="g g-${grade}">${grade}</div><div><div class="which">${t.id==="rev"?"🔁":NUMS[TESTS.indexOf(t)]} ${esc(t.name)}${G.retry?" · 틀린 문제 재시험":""} · ${esc(META.short)}</div><h2>${esc(G.name)} · ${label}</h2><p class="hint">${G.correct} / ${n} 정답 (${Math.round(pct*100)}%)</p></div></div>
+    <div class="when">📅 응시 날짜 <b>${when}</b></div>${srsResult()}
     <div class="pass${passed?"":" fail"}"><span class="big">${passed?"통과":"재시험"}</span><p>틀린 개수 ${G.wrong.length}개 · 통과 기준 ${pm?pm+"개 이하":"모두 맞히기"}${passed?"":`<br>${G.wrong.length-pm}개 더 맞혀야 통과예요.`}${!passed&&t.pen?`<br><b>통과할 때까지 틀린 것만 다시 풀어야 해요.</b>`:""}</p></div>
     <div class="stats"><div class="stat"><b>${G.score.toLocaleString()}</b><span>게임 점수</span></div><div class="stat"><b>${G.correct}/${n}</b><span>맞힌 문제</span></div><div class="stat"><b>×${G.maxCombo}</b><span>최고 콤보</span></div></div>
     <button class="btn" id="cp">결과 복사해서 선생님께 보내기</button>
@@ -564,7 +605,7 @@ function renderResult(){
    </div>
    <div class="panel"><h2>틀린 문제 ${G.wrong.length}개</h2>${G.wrong.length?`<ul class="list">${G.wrong.map(wrongLi).join("")}</ul>`:`<p class="hint">틀린 문제가 없어요.</p>`}</div>
    ${G.wrong.length?`<button class="btn" id="retry">틀린 ${G.wrong.length}문제만 다시 풀기</button>`:""}
-   ${t.pen&&!passed?"":`<button class="btn${G.wrong.length?" ghost":""}" id="again">${esc(t.name)} 전체 다시 풀기</button>`}
+   ${(t.pen&&!passed)||t.id==="rev"?"":`<button class="btn${G.wrong.length?" ghost":""}" id="again">${esc(t.name)} 전체 다시 풀기</button>`}
    ${t.pen&&!passed?"":`<button class="btn ghost" id="home">다른 시험 고르기</button>`}</div>`;
   scrollTo(0,0);
   const inp=$("#line");inp.onclick=inp.onfocus=()=>{inp.select();inp.setSelectionRange(0,inp.value.length)};
