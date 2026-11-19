@@ -224,9 +224,9 @@ const TESTS_VOC2 = [
   {id:"w2",name:"② 동의어·반의어·혼동어 시험",pass:5,parts:[["ek",11],["ke",10],["sac",49]],how:"본문 어휘·숙어 21문제(30%)와 본문에 없는 동의어·반의어·혼동어 49문제(70%)가 차례로 나와요."},
   TESTS_STD[TESTS_STD.length-1]
 ];
-/* 11/19 준호: 위례 단어 세트는 ① 본문 단어 시험만 (동반혼 시험 뺌) */
+/* 11/19 준호: 위례 단어 세트는 ① 본문 단어 시험만 (동반혼 시험 뺌), 다 맞혀야 통과 */
 const TESTS_VOC1 = [
-  {id:"w1",name:"본문 단어 시험",pass:5,parts:[["ek",35],["ke",35]],how:"본문에 나온 어휘·숙어만 나와요. 영어→한국어 35, 한국어→영어 35문제가 차례로 나와요."},
+  {id:"w1",name:"본문 단어 시험",pass:0,parts:[["ek",35],["ke",35]],how:"본문에 나온 어휘·숙어만 나와요. 영어→한국어 35, 한국어→영어 35문제가 차례로 나와요."},
   TESTS_STD[TESTS_STD.length-1]
 ];
 const testsFor = m=>m.tests==="voc1"?TESTS_VOC1:m.tests==="voc2"?TESTS_VOC2:m.tests==="voc"?TESTS_VOC:m.tests==="pen"?TESTS_PEN:TESTS_STD;
@@ -280,12 +280,12 @@ function renderStart(){
     <div><span class="lbl" id="bl">과 고르기</span><div class="books" role="radiogroup" aria-labelledby="bl">${Object.keys(ALL).map(k=>`<button type="button" class="book" role="radio" data-b="${k}" aria-checked="${k===BOOK}">${esc(ALL[k].meta.short)}</button>`).join("")}</div></div>
     <div><label class="lbl" for="nm">이름</label><input class="txt" id="nm" autocomplete="name" maxlength="20" placeholder="이름을 입력하세요" value="${esc(name)}"></div>
     <div><span class="lbl" id="tl">시험 고르기</span>
-    <div class="tests" role="radiogroup" aria-labelledby="tl">${TESTS.filter(x=>!x.hidden).map((x,i)=>`<button type="button" class="test${x.pen?" pen":""}" role="radio" id="t-${x.id}" data-id="${x.id}" aria-checked="${x.id===pick}"><span class="num">${i+1}</span><b>${x.name} · ${total(x)}문제</b><small>${partTxt(x)}</small><span class="meta">통과<br>${passMax(x)}개 이하</span></button>`).join("")}</div></div>
+    <div class="tests" role="radiogroup" aria-labelledby="tl">${TESTS.filter(x=>!x.hidden).map((x,i)=>`<button type="button" class="test${x.pen?" pen":""}" role="radio" id="t-${x.id}" data-id="${x.id}" aria-checked="${x.id===pick}"><span class="num">${i+1}</span><b>${x.name} · ${total(x)}문제</b><small>${partTxt(x)}</small><span class="meta">통과<br>${passMax(x)?passMax(x)+"개 이하":"다 맞히기"}</span></button>`).join("")}</div></div>
     <ul class="rules">
       <li><b>${NUMS[TESTS.indexOf(t)]} ${t.name}: ${t.how}</b></li>
       <li>모두 ${n}문제예요. 제한시간은 ${t.parts.some(([s])=>s!=="ek"&&s!=="ke"&&s!=="sac")?"단어 7초, 어휘 빈칸 15초, 문법 빈칸 20초, 순서배열 50초":"한 문제당 7초"}예요. 시간이 지나면 오답이에요.</li>
       <li>열 때마다 전체 문제은행에서 새로 랜덤으로 뽑혀요. 보기도 매번 섞여요.</li>
-      <li class="passrule"><b>통과 기준: 틀린 개수 ${passMax(t)}개 이하</b></li>
+      <li class="passrule"><b>통과 기준: ${passMax(t)?"틀린 개수 "+passMax(t)+"개 이하":"모두 맞혀야 통과 (틀린 것만 다 맞힐 때까지 재시험)"}</b></li>
     </ul>
     <button type="button" class="btn ghost" id="note">📒 내 오답 노트${name.trim()?` (${Object.keys(noteLoad(name)).length}개)`:""}</button>
     <button type="button" class="toggle" id="snd" aria-pressed="${soundOn}"><span class="sw"></span><span>효과음 ${soundOn?"켜짐":"꺼짐"}</span></button>
