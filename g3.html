@@ -263,6 +263,28 @@ const partTxt = t=>t.sum||t.parts.map(([s,n])=>`${SUB[s].label} ${n}${s==="order
 const timeTxt = t=>[...new Set(t.parts.map(([s])=>SUB[s].time))].map(x=>x+"초").join("·");
 
 
+/* 이번 주 오답: 모든 주차·요일 오답 노트에서 최근 7일 안에 틀린 단어만 모음 */
+function wkNotes(name,days){const from=dayStr(-(days-1)),m={};for(const k in ALL){let n={};try{n=JSON.parse(localStorage.getItem("wt6-note-"+ALL[k].meta.key+"-"+clean(name))||"{}")||{}}catch(e){}
+  for(const key in n){const e=n[key];if(!e||!e.q||e.q._t!=="ek"||!e.last||String(e.last).slice(0,10)<from)continue;const w=e.q.word;if(m[w]){m[w].c+=e.c||1;if(e.last>m[w].last)m[w].last=e.last}else m[w]={q:e.q,c:e.c||1,last:e.last}}}
+  return Object.values(m).sort((a,b)=>b.c-a.c||(b.last>a.last?1:-1))}
+function g3All(){const ek=[];for(const k in ALL)ek.push(...ALL[k].data.ek);return {meta:{short:"고3 이번 주",code:"원탑고3"},data:{ek,ke:[],sac1:[],sac2:[],vocab:[],gram:[],order:[]}}}
+function renderWeek(name){
+  const es=wkNotes(name,7),per=`${mdStr(dayStr(-6))}~${mdStr(dayStr(0))}`;
+  const line=["원탑고3","오답노트",clean(name),per,es.length,es.map(e=>"영한:"+clean(e.q.word)+(e.c>1?"×"+e.c:"")).join(",")].join("|");
+  app.innerHTML=`<div style="display:grid;gap:12px">
+   <header class="brand"><div class="stampmark">원탑</div><div><h1>📄 ${esc(name)}의 이번 주 오답</h1><p>${per} (최근 7일) · 틀린 단어 ${es.length}개 · 모든 요일·복습 포함</p></div></header>
+   ${es.length?`<div class="panel" style="display:grid;gap:8px"><b>학원에 오면</b><p class="hint" style="margin:0">아래 ‘시험지+답지 PDF’를 눌러 바로 인쇄하거나 PDF로 저장해요. 인쇄가 안 되면 ‘복사해서 선생님께 보내기’를 눌러 카톡으로 보내 주세요.</p><button class="btn" id="wpr">🖨 시험지 + 답지 PDF (${es.length}문제)</button><button class="btn ghost" id="wcp">복사해서 선생님께 보내기</button><input class="txt copyline" id="wline" readonly value="${esc(line)}" aria-label="선생님께 보낼 이번 주 오답"></div>
+   <div class="panel"><h2>틀린 단어 ${es.length}개</h2><ul class="list">${es.map(e=>wrongLi(e.q).replace("<li>",`<li><span class="cnt">${e.c}번 틀림 · 마지막 ${esc(e.last)}</span>`)).join("")}</ul></div>`
+   :`<div class="panel"><p class="hint">최근 7일 동안 틀린 단어가 없어요. (같은 폰, 같은 이름으로 푼 기록만 보여요.)</p></div>`}
+   <button class="btn ghost" id="wback">돌아가기</button></div>`;
+  scrollTo(0,0);
+  if($("#wpr"))$("#wpr").onclick=()=>showSheets(sheetOne({short:"고3 이번 주"},name,per,es),()=>renderWeek(name));
+  if($("#wcp"))$("#wcp").onclick=async e=>{const b=e.currentTarget,inp=$("#wline");inp.select();let ok=false;try{await navigator.clipboard.writeText(line);ok=true}catch(err){try{ok=document.execCommand("copy")}catch(e2){}}b.textContent=ok?"복사됨 ✓ 카톡으로 보내 주세요":"아래 칸을 길게 눌러 복사하세요"};
+  if($("#wline"))$("#wline").onclick=()=>{const i=$("#wline");i.select();i.setSelectionRange(0,i.value.length)};
+  $("#wback").onclick=renderStart;
+}
+
+
 /* 간격 반복(망각곡선): 틀린 단어는 1일 뒤 → 맞히면 3일 → 7일 → 14일 → 30일 뒤 다시. 복습에서 또 틀리면 1일부터 다시. 이 폰(브라우저)에만 저장 */
 const SRS_INT=[1,3,7,14,30];
 const SRSKEY=name=>"wt6-srs-g3-"+clean(name);
@@ -338,6 +360,7 @@ function renderStart(){
       <li>열 때마다 전체 문제은행에서 새로 랜덤으로 뽑혀요. 보기도 매번 섞여요.</li>
       <li class="passrule"><b>통과 기준: ${passMax(t)?`틀린 개수 ${passMax(t)}개 이하`:"모두 맞히기 (틀린 문제는 다 맞힐 때까지 다시 풀기)"}</b></li>
     </ul>
+    <button type="button" class="btn ghost" id="wkn">📄 이번 주 오답 시험지 (최근 7일)</button>
     <button type="button" class="btn ghost" id="note">📒 내 오답 노트${name.trim()?` (${Object.keys(noteLoad(name)).length}개)`:""}</button>
     <button type="button" class="toggle" id="snd" aria-pressed="${soundOn}"><span class="sw"></span><span>효과음 ${soundOn?"켜짐":"꺼짐"}</span></button>
     <button class="btn" id="go" ${name.trim()?"":"disabled"}>${t.name} 시작하기</button>
@@ -353,6 +376,7 @@ function renderStart(){
   if(lockPen){go.disabled=true;go.textContent="패널티 시험부터 이어서 끝내세요"}
   nm.oninput=()=>{go.disabled=lockPen||!nm.value.trim();$("#revbox").innerHTML=revBox(nm.value);revBind()};
   revBind();
+  $("#wkn").onclick=()=>{const v=nm.value.trim();if(!v){nm.focus();nm.placeholder="이름을 먼저 입력하세요";return}LS.set("wt-name",v);renderWeek(v)};
   $("#note").onclick=()=>{const v=nm.value.trim();if(!v){nm.focus();nm.placeholder="이름을 먼저 입력하세요";return}LS.set("wt-name",v);renderNote(v)};
   if($("#cont"))$("#cont").onclick=()=>{ac();resumeG(sv)};
   if($("#drop"))$("#drop").onclick=()=>{clearG();renderStart()};
@@ -569,7 +593,7 @@ function parseNoteLines(txt){
   const out=[],bad=[];
   for(const ln of txt.split(/\n+/)){
     const p=ln.split("|").map(s=>s.trim()),i=p.indexOf("오답노트");if(i<1)continue;
-    const L=lessons().find(x=>x.meta.code===p[i-1]);if(!L){bad.push(`${p[i+1]||"?"}: 이 링크에 없는 과의 줄이에요 (${p[i-1]})`);continue}
+    const L=p[i-1]==="원탑고3"?g3All():lessons().find(x=>x.meta.code===p[i-1]);if(!L){bad.push(`${p[i+1]||"?"}: 이 링크에 없는 과의 줄이에요 (${p[i-1]})`);continue}
     const es=[];let miss=0;
     for(const raw of (p[i+4]||"").split(",")){const s=raw.trim();if(!s)continue;const mm=s.match(/^(.*?)(?:×(\d+))?$/),q=findKey(L.data,mm[1].trim(),(L.meta.penMix||[]).map(k=>ALL[k].data));if(q)es.push({q,c:+(mm[2]||1)});else miss++}
     if(miss)bad.push(`${p[i+1]}: 찾지 못한 문제 ${miss}개는 빠졌어요`);
