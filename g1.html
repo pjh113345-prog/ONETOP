@@ -1,8 +1,14 @@
 <!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<script>
+/* 접속 안전장치: 글꼴 서버가 막혀도 화면은 바로 뜨고, 옛날 폰에서 스크립트가 멈추면 안내 문구를 보여 준다 */
+(function(){function show(m){try{var d=document.getElementById("ot-err");if(!d){d=document.createElement("div");d.id="ot-err";d.style.cssText="position:fixed;left:0;right:0;top:0;z-index:99999;background:#fff3cd;color:#1b2140;padding:14px 16px;font:15px/1.5 sans-serif;border-bottom:2px solid #ef7d16";(document.body||document.documentElement).appendChild(d)}d.innerHTML="<b>시험 화면이 제대로 안 열렸어요.</b><br>카톡이면 오른쪽 아래(또는 위) ⋮ 메뉴 → <b>다른 브라우저로 열기</b>(크롬·삼성인터넷·사파리)로 다시 열어 주세요.<br><small style=\"color:#5d6482\">"+m+"</small>"}catch(e){}}
+window.onerror=function(msg){if(!window.__otReady)show(String(msg).slice(0,120));};
+setTimeout(function(){if(!window.__otReady)show("loading timeout")},12000);})();
+</script>
 <title>원탑 1학년 공통영어2 3·4과 · 올림포스 · 10월 모고 시험</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=Source+Serif+4:opsz,wght@8..60,500;8..60,600&family=Noto+Sans+KR:wght@400;500;700;900&display=swap">
+<link rel="stylesheet" media="print" onload="this.media='all'" href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=Source+Serif+4:opsz,wght@8..60,500;8..60,600&family=Noto+Sans+KR:wght@400;500;700;900&display=swap"><noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=Source+Serif+4:opsz,wght@8..60,500;8..60,600&family=Noto+Sans+KR:wght@400;500;700;900&display=swap"></noscript>
 <style>
 /* Layout: one-screen phone game. Start = name + five test cards; game = HUD, timer, question card, choices (or chunk tray for 순서배열). Navy ink with a stamp-red accent, the 원탑 house look. */
 :root{
@@ -188,7 +194,7 @@ textarea.txt{width:100%;font:inherit;font-size:14px;padding:10px 12px;border:1.5
 
 <script>
 /* 새 버전 자동 불러오기: version.json(캐시 안 씀)과 비교해서 옛 화면이면 새 주소로 다시 연다 */
-(function(){var V="20261123a";try{fetch("version.json?t="+Date.now(),{cache:"no-store"}).then(function(r){return r.json()}).then(function(j){var n=j&&j.g1;if(!n||n===V)return;var k="wt6-reload-"+n;try{if(sessionStorage.getItem(k))return;sessionStorage.setItem(k,"1")}catch(e){}var u=location.pathname+"?v="+n+location.hash;location.replace(u)}).catch(function(){})}catch(e){}})();
+(function(){var V="20261126a";try{fetch("version.json?t="+Date.now(),{cache:"no-store"}).then(function(r){return r.json()}).then(function(j){var n=j&&j.g1;if(!n||n===V)return;var k="wt6-reload-"+n;try{if(sessionStorage.getItem(k))return;sessionStorage.setItem(k,"1")}catch(e){}var u=location.pathname+"?v="+n+location.hash;location.replace(u)}).catch(function(){})}catch(e){}})();
 </script>
 <script>
 function LS0(k){try{return localStorage.getItem(k)}catch(e){return null}}
@@ -575,6 +581,8 @@ function renderResult(){
   if(passed){bigConfetti();sfxFanfare()}
 }
 /* 저장 데이터가 꼬여서 첫 화면이 안 뜨면: 이 과 저장만 지우고 다시 그림 */ try{renderStart()}catch(e){try{clearG();localStorage.removeItem(META.key+"-test");pick=TESTS[0].id;renderStart()}catch(e2){app.innerHTML='<div class="panel"><p>화면을 여는 중 문제가 생겼어요.</p><button class="btn" onclick="try{Object.keys(localStorage).filter(k=>k.indexOf(\'wt\')===0&&k.indexOf(\'-note-\')<0).forEach(k=>localStorage.removeItem(k))}catch(e){}location.reload()">저장 지우고 다시 열기</button></div>'}}
+
+;window.__otReady=1;
 </script>
 
 </body></html>
