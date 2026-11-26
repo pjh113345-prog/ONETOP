@@ -163,6 +163,13 @@ input.txt{width:100%;font:inherit;font-size:17px;padding:11px 12px;border:1.5px 
 textarea.txt{width:100%;font:inherit;font-size:14px;padding:10px 12px;border:1.5px solid var(--line);border-radius:10px;background:var(--bg);color:var(--ink);resize:vertical;min-height:140px}
 .linkbtn{display:block;margin:6px auto 0;background:none;border:0;color:var(--muted);text-decoration:underline;font:inherit;font-size:14px;padding:10px;cursor:pointer}
 .sbar{display:grid;gap:8px}
+.pdfbox{position:fixed;left:-12000px;top:0;width:720px;background:#fff;z-index:-1}
+.pdfbox .sheet{box-shadow:none;border-radius:0;padding:0;width:720px}
+.pdfbox .sopts{grid-template-columns:1fr 1fr!important}
+.pdfst{margin:0;font-size:14px;line-height:1.5}
+.pdfst.err{color:#b3261e}
+.kakaowarn{background:#fff3cd;border:2px solid #ef7d16;border-radius:10px;padding:10px 12px;display:grid;gap:8px;font-size:14px;line-height:1.5}
+
 .sheets{display:grid;gap:14px;margin-top:12px}
 .sheet{background:#fff;color:#141414;border-radius:8px;padding:20px 18px;font-size:14px;line-height:1.5;box-shadow:var(--shadow);min-width:0;overflow-wrap:anywhere}
 .shead{display:flex;justify-content:space-between;align-items:baseline;gap:8px;border-bottom:2px solid #141414;padding-bottom:6px;margin-bottom:8px;font-size:15px}
@@ -284,7 +291,7 @@ function renderWeek(name){
    :`<div class="panel"><p class="hint">최근 7일 동안 틀린 단어가 없어요. (같은 폰, 같은 이름으로 푼 기록만 보여요.)</p></div>`}
    <button class="btn ghost" id="wback">돌아가기</button></div>`;
   scrollTo(0,0);
-  if($("#wpr"))$("#wpr").onclick=()=>showSheets(sheetOne({short:"고3 이번 주"},name,per,es),()=>renderWeek(name));
+  if($("#wpr"))$("#wpr").onclick=()=>showSheets(sheetOne({short:"고3 이번 주"},name,per,es),()=>renderWeek(name),"",line);
   if($("#wcp"))$("#wcp").onclick=async e=>{const b=e.currentTarget,inp=$("#wline");inp.select();let ok=false;try{await navigator.clipboard.writeText(line);ok=true}catch(err){try{ok=document.execCommand("copy")}catch(e2){}}b.textContent=ok?"복사됨 ✓ 카톡으로 보내 주세요":"아래 칸을 길게 눌러 복사하세요"};
   if($("#wline"))$("#wline").onclick=()=>{const i=$("#wline");i.select();i.setSelectionRange(0,i.value.length)};
   $("#wback").onclick=renderStart;
@@ -553,7 +560,7 @@ function renderNote(name){
    <button class="btn ghost" id="nback">돌아가기</button></div>`;
   scrollTo(0,0);
   if($("#prac"))$("#prac").onclick=()=>{ac();startGame(name,"note",es.map(e=>e.q))};
-  if($("#npr"))$("#npr").onclick=()=>showSheets(sheetOne(META,name,stamp(),es),()=>renderNote(name));
+  if($("#npr"))$("#npr").onclick=()=>showSheets(sheetOne(META,name,stamp(),es),()=>renderNote(name),"",line);
   if($("#ncp"))$("#ncp").onclick=async e=>{const b=e.currentTarget,inp=$("#nline");inp.select();let ok=false;try{await navigator.clipboard.writeText(line);ok=true}catch(err){try{ok=document.execCommand("copy")}catch(e2){}}b.textContent=ok?"복사됨 ✓":"아래 칸을 길게 눌러 복사하세요"};
   $("#nback").onclick=renderStart;
 }
@@ -576,11 +583,102 @@ function sheetOne(meta,name,date,es){
   return `<article class="sheet"><div class="shead"><b>원탑영어학원 · ${esc(meta.short)} 오답 노트 시험지</b><span>${no}문제</span></div><div class="sinfo"><span>이름: <b>${esc(name)}</b></span><span>오답 기록: ${esc(date)}</span><span>점수: ______ / ${no}</span></div>${secs}</article>
   <article class="sheet"><div class="shead"><b>정답 · ${esc(meta.short)} 오답 노트</b><span>${esc(name)}</span></div><ol class="keys">${keys.map(([n,a])=>`<li><b>${n}.</b> ${esc(a)}</li>`).join("")}</ol></article>`;
 }
-function showSheets(html,back,warn){
-  app.innerHTML=`<div class="noprint sbar"><button class="btn" id="sprint">🖨 인쇄 / PDF로 저장</button><p class="hint" id="shint">인쇄 창에서 프린터를 고르거나 ‘PDF로 저장’을 고르세요. 시험지 다음 쪽에 정답이 있어요.</p>${warn||""}<button class="btn ghost" id="sback">돌아가기</button></div><div class="sheets">${html}</div>`;
+
+/* ===== 폰에서도 PDF 파일로 저장 (2026-11-26) ===== */
+const OT_GH="https://pjh113345-prog.github.io/ONETOP/g3.html";
+const OT_UA=navigator.userAgent||"";
+const OT_KAKAO=/KAKAOTALK/i.test(OT_UA);
+const OT_INAPP=OT_KAKAO||/NAVER\(inapp|Instagram|FBAN|FBAV|Line\/|everytimeApp|DaumApps|; wv\)/i.test(OT_UA);
+const OT_IOS=/iPhone|iPad|iPod/i.test(OT_UA)||(/Macintosh/.test(OT_UA)&&navigator.maxTouchPoints>1);
+let OT_INFRAME=false;try{OT_INFRAME=window.top!==window.self}catch(e){OT_INFRAME=true}
+let OT_DL=null;try{if(window.claude&&claude.use)claude.use("downloads").then(d=>{OT_DL=d}).catch(()=>{})}catch(e){}
+function otLoad(urls){return new Promise((ok,no)=>{let i=0;const next=()=>{if(i>=urls.length)return no(new Error("load"));const sc=document.createElement("script");sc.src=urls[i++];sc.onload=ok;sc.onerror=()=>{sc.remove();next()};document.head.appendChild(sc)};next()})}
+async function otLibs(){
+  if(!window.html2canvas)await otLoad(["lib/html2canvas.min.js","https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js","https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js","https://unpkg.com/html2canvas@1.4.1/dist/html2canvas.min.js"]);
+  if(!(window.jspdf&&window.jspdf.jsPDF))await otLoad(["lib/jspdf.umd.min.js","https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js","https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js","https://unpkg.com/jspdf@2.5.1/dist/jspdf.umd.min.js"]);
+}
+/* 시험지(.sheet)마다 A4 쪽으로 나눠 그림. 문제 중간에서 잘리지 않게 문제 경계에서 자름 */
+async function otMakePdf(sheets,onStep){
+  await otLibs();
+  const {jsPDF}=window.jspdf,W=720,PH=Math.floor(W*273/186),pdf=new jsPDF({unit:"mm",format:"a4",compress:true});
+  const box=document.createElement("div");box.className="pdfbox";document.body.appendChild(box);
+  let first=true;
+  try{
+    for(let si=0;si<sheets.length;si++){
+      onStep&&onStep(si+1,sheets.length);
+      box.innerHTML="";const el=sheets[si].cloneNode(true);box.appendChild(el);
+      await new Promise(r=>setTimeout(r,30));
+      const top=el.getBoundingClientRect().top,H=Math.ceil(el.scrollHeight);
+      const cuts=[...el.querySelectorAll(".sq,.ssec h3,.shead,.sinfo,.keys li")].map(n=>Math.round(n.getBoundingClientRect().bottom-top)).filter(y=>y>0&&y<H).sort((a,b)=>a-b);
+      const sc=Math.min(2,Math.max(1.3,(window.devicePixelRatio||1)));
+      const cv=await html2canvas(el,{scale:sc,backgroundColor:"#ffffff",useCORS:true,logging:false,width:W,windowWidth:W});
+      let y=0;
+      while(y<H-2){
+        let end=y+PH;
+        if(end<H){const c=cuts.filter(v=>v>y+PH*0.5&&v<=end);if(c.length)end=c[c.length-1]}else end=H;
+        const pc=document.createElement("canvas");pc.width=Math.round(W*sc);pc.height=Math.round((end-y)*sc);
+        const g=pc.getContext("2d");g.fillStyle="#fff";g.fillRect(0,0,pc.width,pc.height);
+        g.drawImage(cv,0,Math.round(y*sc),pc.width,pc.height,0,0,pc.width,pc.height);
+        if(!first)pdf.addPage();first=false;
+        pdf.addImage(pc.toDataURL("image/jpeg",0.88),"JPEG",12,12,186,186*(end-y)/W);
+        y=end;
+      }
+    }
+  }finally{box.remove()}
+  return pdf.output("blob");
+}
+function otExtUrl(line){return OT_GH+(line?"#sheet="+encodeURIComponent(line):"")}
+function otOpenOutside(line){
+  const u=otExtUrl(line);
+  if(OT_KAKAO){location.href="kakaotalk://web/openExternal?url="+encodeURIComponent(u);return}
+  if(/Android/i.test(OT_UA)&&OT_INAPP){location.href="intent://"+u.replace(/^https:\/\//,"")+"#Intent;scheme=https;package=com.android.chrome;end";return}
+  try{const w=window.open(u,"_blank");if(w)return}catch(e){}
+  location.href=u;
+}
+async function otCopy(t){try{await navigator.clipboard.writeText(t);return true}catch(e){try{const i=document.createElement("textarea");i.value=t;document.body.appendChild(i);i.select();const ok=document.execCommand("copy");i.remove();return ok}catch(e2){return false}}}
+function showSheets(html,back,warn,line){
+  const fname=(()=>{const m=html.match(/이름: <b>([^<]*)<\/b>/);return "원탑_오답시험지_"+((m&&m[1])||"").replace(/[\\/:*?"<>|\s]+/g,"")+"_"+stamp().slice(0,10)+".pdf"})();
+  const ext=!!line;
+  const kakao=OT_INAPP?`<div class="kakaowarn"><b>⚠ 카톡(앱 안) 화면에서는 파일 저장이 안 될 수 있어요.</b><span>아래 버튼을 누르면 크롬·사파리로 이 시험지가 그대로 열려요. 거기서 ‘PDF 파일로 저장’을 누르세요.</span>${ext?`<button class="btn" id="sext">🌐 크롬·사파리로 열기</button>`:""}<span class="hint" style="margin:0">안 열리면: 오른쪽 위(또는 아래) ⋮ 메뉴 → ‘다른 브라우저로 열기’</span></div>`:"";
+  app.innerHTML=`<div class="noprint sbar">${kakao}<button class="btn" id="spdf">📥 PDF 파일로 저장 (폰·컴퓨터)</button><div id="sdone" style="display:none;gap:8px"></div><p class="pdfst hint" id="sst" role="status"></p><button class="btn ghost" id="sprint">🖨 인쇄하기 (컴퓨터·프린터)</button><p class="hint" id="shint">시험지 다음 쪽에 정답이 있어요.</p>${warn||""}<button class="btn ghost" id="sback">돌아가기</button></div><div class="sheets">${html}</div>`;
   scrollTo(0,0);
-  $("#sback").onclick=back;
-  $("#sprint").onclick=()=>{let ok=false;const f=()=>{ok=true};addEventListener("beforeprint",f);try{window.print()}catch(e){}setTimeout(()=>{removeEventListener("beforeprint",f);if(!ok)$("#shint").textContent="여기서는 인쇄 창이 열리지 않았어요. 컴퓨터 크롬에서 이 링크를 열고 다시 눌러 보세요."},900)};
+  $("#sback").onclick=()=>{try{if(location.hash.indexOf("#sheet=")===0)history.replaceState(null,"",location.pathname+location.search)}catch(e){}back()};
+  if($("#sext"))$("#sext").onclick=()=>otOpenOutside(line);
+  const st=(t,err)=>{const p=$("#sst");p.textContent=t;p.className="pdfst hint"+(err?" err":"")};
+  let blob=null,url=null;
+  const outsideHelp=()=>{const d=$("#sdone");d.style.display="grid";d.insertAdjacentHTML("beforeend",`${ext?`<button class="btn" id="sext2">🌐 크롬·사파리에서 열어 저장하기</button>`:""}<button class="btn ghost" id="slink">주소 복사하기 (크롬·사파리에 붙여 넣기)</button>`);
+    if($("#sext2"))$("#sext2").onclick=()=>otOpenOutside(line);
+    $("#slink").onclick=async e=>{const ok=await otCopy(otExtUrl(line));e.currentTarget.textContent=ok?"복사됨 ✓ 크롬·사파리 주소창에 붙여 넣으세요":"복사가 안 돼요. 카톡 ⋮ 메뉴 → 다른 브라우저로 열기"}};
+  const saveIt=async()=>{
+    if(!OT_DL&&window.claude&&claude.use){try{OT_DL=await Promise.race([claude.use("downloads"),new Promise(r=>setTimeout(()=>r(null),3000))])}catch(e){}}
+    const file=new File([blob],fname,{type:"application/pdf"});
+    if(OT_DL){try{await OT_DL.save({filename:fname,data:blob});st("저장했어요 ✓ 폰의 ‘다운로드’(내 파일) 폴더를 확인하세요.");return}catch(e){if(e&&e.code==="declined"){st("저장을 취소했어요. 다시 누르면 저장돼요.",1);return}}}
+    if(OT_IOS&&navigator.canShare&&navigator.share){try{if(navigator.canShare({files:[file]})){await navigator.share({files:[file],title:fname});st("‘파일에 저장’을 고르면 저장돼요 ✓");return}}catch(e){if(e&&e.name==="AbortError"){st("취소했어요. 다시 누르면 저장 창이 떠요.",1);return}}}
+    if(OT_INFRAME&&!OT_DL){st("여기서는 저장이 막혀 있어요. 아래 버튼으로 크롬·사파리에서 열어 저장하세요.",1);if(!$("#slink"))outsideHelp();return}
+    const a=document.createElement("a");a.href=url;a.download=fname;a.rel="noopener";document.body.appendChild(a);a.click();setTimeout(()=>a.remove(),500);
+    st(OT_INAPP?"저장이 안 되면 위의 ‘크롬·사파리로 열기’를 눌러 주세요.":"저장했어요 ✓ 폰의 ‘다운로드’(내 파일) 폴더나 알림창을 확인하세요.",OT_INAPP);
+  };
+  $("#spdf").onclick=async()=>{
+    const b=$("#spdf");
+    if(blob){saveIt();return}
+    b.disabled=true;
+    try{
+      blob=await otMakePdf([...document.querySelectorAll(".sheets .sheet")],(i,n)=>st(`PDF 만드는 중… (${i}/${n}) 잠시만 기다려 주세요`));
+      url=URL.createObjectURL(blob);
+      b.disabled=false;b.textContent="📥 다시 저장하기";
+      const d=$("#sdone");d.style.display="grid";
+      d.innerHTML=`<button class="btn" id="ssave">💾 PDF 저장하기 (${Math.max(1,Math.round(blob.size/1024))}KB)</button>${OT_INFRAME?"":`<button class="btn ghost" id="sopen">📄 PDF 열어 보기</button>`}`;
+      st("PDF를 만들었어요. 위 ‘PDF 저장하기’를 눌러 주세요.");
+      $("#ssave").onclick=saveIt;
+      if($("#sopen"))$("#sopen").onclick=()=>{try{const w=window.open(url,"_blank");if(!w)location.href=url}catch(e){location.href=url}};
+      if(OT_INAPP||(OT_INFRAME&&!OT_DL))outsideHelp();
+    }catch(e){
+      b.disabled=false;
+      st("PDF를 만들지 못했어요"+(e&&e.message==="load"?" (인터넷 연결 확인)":"")+". 아래 방법을 써 보세요.",1);
+      if(!$("#slink"))outsideHelp();
+    }
+  };
+  $("#sprint").onclick=()=>{let ok=false;const f=()=>{ok=true};addEventListener("beforeprint",f);try{window.print()}catch(e){}setTimeout(()=>{removeEventListener("beforeprint",f);if(!ok)$("#shint").textContent="여기서는 인쇄 창이 열리지 않았어요. 위의 ‘PDF 파일로 저장’을 쓰세요."},900)};
 }
 function lessons(){return typeof ALL!=="undefined"?Object.values(ALL):[{meta:META,data:DATA}]}
 function findKey(D0,k,mix){
@@ -654,6 +752,9 @@ function renderResult(){
   if(passed){bigConfetti();sfxFanfare()}
 }
 /* 저장 데이터가 꼬여서 첫 화면이 안 뜨면: 이 과 저장만 지우고 다시 그림 */ try{renderStart()}catch(e){try{clearG();localStorage.removeItem(META.key+"-test");pick=TESTS[0].id;renderStart()}catch(e2){app.innerHTML='<div class="panel"><p>화면을 여는 중 문제가 생겼어요.</p><button class="btn" onclick="try{Object.keys(localStorage).filter(k=>k.indexOf(\'wt\')===0&&k.indexOf(\'-note-\')<0).forEach(k=>localStorage.removeItem(k))}catch(e){}location.reload()">저장 지우고 다시 열기</button></div>'}}
+
+/* 카톡 → 크롬으로 넘어왔을 때: 주소의 오답 줄로 같은 시험지 바로 열기 */
+try{if(location.hash.indexOf("#sheet=")===0){const ln=decodeURIComponent(location.hash.slice(7)),{out}=parseNoteLines(ln);if(out.length)showSheets(out.map(o=>sheetOne(o.meta,o.name,o.date,o.es)).join(""),renderStart,"",ln)}}catch(e){}
 
 ;window.__otReady=1;
 </script>
